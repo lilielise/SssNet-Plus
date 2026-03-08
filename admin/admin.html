@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin • SSSNET</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+.admin-row{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px; border-bottom:1px solid #eee }
+.news-actions button{ margin-left:6px }
+.section-title{ display:flex; justify-content:space-between; align-items:center; }
+.small-muted{ color:#666; font-size:13px }
+.input{ padding:10px; border-radius:10px; border:1px solid #eee; width:100%; box-sizing:border-box }
+</style>
+</head>
+<body>
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 style="letter-spacing:1px">SSSNET ADMIN</h1>
+    <div>Active: <span id="activeCount">0</span></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">
+      <h2>Buat Event Baru</h2>
+      <div class="small-muted">Buat event & lineup lagu</div>
+    </div>
+    <input id="ev_name" class="input" placeholder="Nama Event"><br><br>
+    <div style="display:flex;gap:8px">
+      <input id="ev_start" type="datetime-local" class="input">
+      <input id="ev_end" type="datetime-local" class="input">
+    </div>
+    <div id="songs_container" style="margin-top:12px"></div>
+    <p><button class="btn" onclick="addSongRow()">+ Add another song</button></p>
+    <p><button class="btn" onclick="submitEvent()">SUBMIT • Make Event</button></p>
+    <p class="small-muted">Setelah submit, event akan muncul di Events list. Gunakan Reset Votes atau Add Vote di Event Management.</p>
+  </div>
+
+  <div class="card">
+    <h2>Artist Requests</h2>
+    <div id="requests">loading...</div>
+  </div>
+
+  <div class="card">
+    <h2>Approved Artists</h2>
+    <div id="artist_list">loading...</div>
+  </div>
+
+  <div class="card">
+    <h2>Events Management</h2>
+    <div id="events_admin">loading...</div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2>SNEWS (All)</h2>
+      <div class="small-muted">Pin / Unpin / Delete news</div>
+    </div>
+    <div id="news_admin">loading news...</div>
+    <hr>
+    <h3>Create Admin News (pinned visible at top)</h3>
+    <input id="anews_title" class="input" placeholder="Judul berita">
+    <textarea id="anews_body" class="input" placeholder="Isi berita" style="height:80px"></textarea>
+    <input id="anews_image" placeholder="image url (opsional)" class="input">
+    <div style="margin-top:8px">
+      <label><input type="checkbox" id="anews_pin"> Pin this news</label>
+      <button class="btn" onclick="createAdminNews()">Create & Publish</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>

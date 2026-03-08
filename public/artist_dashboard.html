@@ -1,0 +1,214 @@
+cat > public/artist_dashboard.html <<'HTML'
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Artist Dashboard • SSSNET</title>
+<link rel="stylesheet" href="style.css">
+<link href="https://unpkg.com/cropperjs@1.5.13/dist/cropper.min.css" rel="stylesheet">
+<style>
+.preview{ width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #eee }
+.card-compact{ padding:10px;border-radius:10px;background:#fff;margin-bottom:8px }
+</style>
+</head>
+<body>
+<a href="/">← Home</a>
+<div class="container">
+  <h1>Artist Dashboard</h1>
+  <div class="card">
+    <h3>Upload Reel (video)</h3>
+    <input type="file" id="videoFile" accept="video/*"><br><br>
+    <div class="row">
+      <div style="flex:1"><input id="startSec" class="input" placeholder="start (s)"></div>
+      <div style="flex:1"><input id="endSec" class="input" placeholder="end (s)"></div>
+    </div>
+    <div style="margin-top:8px">
+      <label>Effect</label><br>
+      <button class="btn" onclick="setEffect('none')">None</button>
+      <button class="btn" onclick="setEffect('grayscale')">Grayscale</button>
+      <button class="btn" onclick="setEffect('sepia')">Sepia</button>
+      <button class="btn" onclick="setEffect('vivid')">Vivid</button>
+    </div>
+    <div style="margin-top:8px">
+      <input id="overlayText" class="input" placeholder="Overlay Text (opsional)">
+      <input id="audioURL" class="input" placeholder="Tambahkan audio (opsional)">
+    </div>
+    <div style="margin-top:8px">
+      <button class="btn" onclick="uploadReel()">POST REEL</button>
+    </div>
+
+    <hr>
+    <h4>Preview</h4>
+    <div id="video-preview-wrap" style="background:#000;padding:8px;border-radius:8px">
+      <video id="videoPreview" style="width:100%;max-height:60vh;object-fit:contain" controls muted></video>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Post SNEWS</h3>
+    <input id="news_title" class="input" placeholder="Judul berita">
+    <textarea id="news_body" class="input" placeholder="Isi berita" style="height:100px"></textarea>
+    <div style="margin-top:8px">
+      <button class="btn" onclick="openCropModal('news-image')">Upload Gambar Berita</button>
+      <img id="news-image-preview" src="" style="width:120px;height:80px;object-fit:cover;margin-left:8px;display:none">
+    </div>
+    <div style="margin-top:8px"><button class="btn" onclick="postSnews()">Post</button></div>
+  </div>
+
+  <div class="card">
+    <h3>Your Content</h3>
+    <div id="artist_content">loading...</div>
+  </div>
+</div>
+
+<!-- reuse crop modal from profile (simpler duplicate) -->
+<div id="crop-backdrop" class="modal-backdrop" style="display:none">
+  <div class="crop-modal">
+    <h3>Crop and Upload</h3>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1">
+        <div style="width:100%;height:420px;display:flex;align-items:center;justify-content:center;background:#f6f6f6;padding:8px">
+          <img id="crop-image" style="max-width:100%;max-height:100%;display:block" src="">
+        </div>
+        <div style="margin-top:8px">
+          <input type="file" id="crop-input" accept="image/*">
+        </div>
+      </div>
+      <div style="width:260px">
+        <div style="margin-bottom:8px"><b>Preview</b></div>
+        <canvas id="crop-preview" style="width:100%;border-radius:8px;background:#eee"></canvas>
+        <div style="margin-top:12px">
+          <button class="btn" id="crop-upload-btn">Upload</button>
+          <button class="btn" style="background:#ccc;color:#000;margin-left:8px" id="crop-cancel-btn">Batal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/cropperjs@1.5.13/dist/cropper.min.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const artistId = params.get("id");
+if(!artistId){ alert("Artist ID missing"); location.href="/"; }
+
+let currentEffect = 'none';
+function setEffect(e){ currentEffect = e; const vid = document.getElementById("videoPreview"); vid.style.filter = e === 'none' ? 'none' : (e==='grayscale'?'grayscale(1)': e==='sepia'?'sepia(1)':'contrast(1.08) saturate(1.2)'); }
+
+document.getElementById("videoFile").addEventListener("change", (ev)=>{
+  const f = ev.target.files[0]; if(!f) return;
+  const url = URL.createObjectURL(f);
+  const v = document.getElementById("videoPreview");
+  v.src = url; v.muted = true; v.loop = true; v.play().catch(()=>{});
+});
+
+async function uploadReel(){
+  const f = document.getElementById("videoFile").files[0];
+  if(!f) return alert("Pilih file video");
+  const start = Number(document.getElementById("startSec").value) || 0;
+  const end = Number(document.getElementById("endSec").value) || 0;
+  const caption = document.getElementById("videoCaption")?.value || "";
+  const overlayText = document.getElementById("overlayText").value || "";
+  // send file raw, server will keep original; advanced trimming not done server-side in this simple flow
+  const fd = new FormData();
+  fd.append("video", f);
+  fd.append("artistId", artistId);
+  fd.append("start", start);
+  fd.append("end", end);
+  fd.append("overlayText", overlayText);
+  fd.append("effect", currentEffect);
+  const res = await fetch("/upload/video", { method:"POST", body: fd });
+  const j = await res.json();
+  if(j.success){ alert("Video uploaded"); loadContent(); } else alert(j.error || "gagal");
+}
+
+// SNEWS post (upload image via crop modal first, preview filled)
+let newsImageUrl = null;
+function openCropModal(target){
+  window._cropTarget = target;
+  document.getElementById("crop-backdrop").style.display = 'flex';
+  document.getElementById("crop-image").src = '';
+  document.getElementById("crop-input").value = '';
+}
+const cropInput = document.getElementById("crop-input");
+const cropImage = document.getElementById("crop-image");
+const cropPreview = document.getElementById("crop-preview");
+let cropper = null;
+cropInput.addEventListener("change", (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  cropImage.src = URL.createObjectURL(f);
+  if(cropper) cropper.destroy();
+  cropImage.onload = () => {
+    cropper = new Cropper(cropImage, { viewMode:1, autoCropArea:1, aspectRatio:16/9 });
+    updatePreview();
+    cropper.on('crop', updatePreview);
+  };
+});
+function updatePreview(){
+  if(!cropper) return;
+  const canvas = cropper.getCroppedCanvas({ width: 1200, height: 675 });
+  cropPreview.width = 260; cropPreview.height = 146;
+  const ctx = cropPreview.getContext('2d');
+  ctx.clearRect(0,0,cropPreview.width,cropPreview.height);
+  ctx.drawImage(canvas, 0, 0, cropPreview.width, cropPreview.height);
+}
+document.getElementById("crop-upload-btn").addEventListener("click", async ()=>{
+  if(!cropper) return alert("Pilih file");
+  const blob = await new Promise(res => cropper.getCroppedCanvas().toBlob(res, 'image/jpeg', 0.9));
+  const fd = new FormData(); fd.append("cover", blob, "news.jpg");
+  const r = await fetch("/upload/cover", { method:"POST", body: fd });
+  const j = await r.json();
+  if(!j || !j.url) return alert("gagal upload");
+  if(window._cropTarget === 'news-image'){
+    newsImageUrl = j.url;
+    document.getElementById("news-image-preview").src = newsImageUrl;
+    document.getElementById("news-image-preview").style.display = 'inline-block';
+  }
+  // close modal
+  if(cropper){ cropper.destroy(); cropper = null; }
+  document.getElementById("crop-backdrop").style.display = 'none';
+});
+document.getElementById("crop-cancel-btn").addEventListener("click", ()=>{
+  if(cropper){ cropper.destroy(); cropper = null; }
+  document.getElementById("crop-backdrop").style.display = 'none';
+});
+
+async function postSnews(){
+  const title = document.getElementById("news_title").value.trim();
+  const body = document.getElementById("news_body").value.trim();
+  if(!title || !body) return alert("Judul & isi wajib");
+  const res = await fetch("/artist/" + artistId + "/news", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ title, body, image: newsImageUrl })});
+  const j = await res.json();
+  if(j.success){ alert("News posted"); document.getElementById("news_title").value=''; document.getElementById("news_body").value=''; newsImageUrl = null; document.getElementById("news-image-preview").style.display='none'; loadContent(); } else alert(j.error||"gagal");
+}
+
+async function loadContent(){
+  const artist = await fetch("/artists/" + artistId).then(r=>r.json());
+  const videos = artist.videos || [];
+  const news = artist.news || [];
+  const el = document.getElementById("artist_content");
+  el.innerHTML = `
+    <h4>Reels</h4>
+    ${videos.length ? videos.map(v=>`<div class="card-compact"><video src="${v.file}" controls width="100"></video><div class="small-muted">${new Date(v.createdAt).toLocaleString()}</div><div style="margin-top:6px"><button class="btn" onclick="deleteVideo(${v.id})">Delete</button></div></div>`).join("") : "<p>Tidak ada reels</p>"}
+    <h4 style="margin-top:12px">SNEWS</h4>
+    ${news.length ? news.map(n=>`<div class="card-compact"><h4>${n.title}</h4><div class="small-muted">${new Date(n.createdAt).toLocaleString()}</div><p>${n.body}</p><div style="margin-top:6px"><button class="btn" onclick="deleteNewsArtist(${n.id})">Delete</button></div></div>`).join("") : "<p>Tidak ada news</p>"}
+  `;
+}
+
+async function deleteVideo(id){
+  if(!confirm("Hapus video?")) return;
+  const res = await fetch("/artist/" + artistId + "/deleteVideo", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ videoId: id })});
+  const j = await res.json();
+  if(j.success){ alert("Video deleted"); loadContent(); } else alert(j.error||"gagal");
+}
+async function deleteNewsArtist(id){
+  if(!confirm("Hapus news?")) return;
+  const res = await fetch("/artist/" + artistId + "/deleteNews", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ newsId: id })});
+  const j = await res.json();
+  if(j.success){ alert("News deleted"); loadContent(); } else alert(j.error||"gagal");
+}
+
+loadContent();
+</script>
+</body>
+</html>
+HTML

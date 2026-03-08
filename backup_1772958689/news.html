@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SNEWS - SSSNET</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a href="/">← Home</a>
+<h1>SNEWS</h1>
+<div id="news-list" class="container"></div>
+
+<script>
+async function loadNews(){
+  const list = await fetch("/news").then(r=>r.json());
+  const el = document.getElementById("news-list");
+  if(!list.length) { el.innerHTML = "<p>Belum ada berita.</p>"; return; }
+  el.innerHTML = list.map(n=>{
+    if(n.pinned && n.admin){
+      return `<div class="card admin-news">
+        <h3>📌 ${n.title}</h3>
+        <p class="small">${new Date(n.createdAt).toLocaleString()}</p>
+        <p>${n.body}</p>
+      </div>`;
+    }
+    return `<div class="card news-item">
+      <img src="${n.image || '/uploads/covers/placeholder.jpg'}" class="cover-img">
+      <div class="song-info">
+        <h3>${n.title}</h3>
+        <p class="small">oleh ${n.artistId ? 'Artist' : 'SSSNET' } • ${new Date(n.createdAt).toLocaleDateString()}</p>
+        <p>${n.body}</p>
+        <div style="margin-top:6px"><button onclick="likeNews(${n.id})" class="btn">Like</button>
+        <button onclick="openComments('news',${n.id})" class="btn" style="background:#666">Comment</button></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function likeNews(id){
+  await fetch("/like", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ type:"news", targetId: id })});
+  alert("Toggled like");
+}
+function openComments(type, targetId){
+  // open comment modal or simple prompt
+  const text = prompt("Tulis komentar:");
+  if(!text) return;
+  fetch("/comments", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ type, targetId, userName: "Anon", text })})
+  .then(r=>r.json()).then(j=>{ if(j.success) alert("Komentar terkirim"); else alert(j.error||"gagal"); });
+}
+
+loadNews();
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profile / Daftar</title>
+<link rel="stylesheet" href="style.css"></head>
+<body>
+<a href="/">← Home</a>
+
+<div class="container card">
+  <h1>Account</h1>
+
+  <div style="display:flex;gap:8px;margin-bottom:8px;">
+    <button id="btnFan" class="btn" onclick="setRole('fan')">FAN</button>
+    <button id="btnArtist" class="btn" onclick="setRole('artist')">ARTIST</button>
+  </div>
+
+  <div id="register-box">
+    <input id="name" class="input" placeholder="Nama (username)"><br><br>
+    <input id="contact" class="input" placeholder="Contact / Bio (opsional)"><br><br>
+    <button id="regBtn" class="btn">Daftar</button>
+    <p class="small">Jika pilih ARTIST: admin harus approve sebelum fitur ARTIST aktif.</p>
+  </div>
+
+  <div id="status-box"></div>
+</div>
+
+<script>
+let role = 'fan';
+function setRole(r){ role = r; document.getElementById('btnFan').style.opacity = r==='fan' ? '1' : '0.6'; document.getElementById('btnArtist').style.opacity = r==='artist' ? '1' : '0.6'; }
+
+function getLocalArtist(){ try{ return JSON.parse(localStorage.getItem("sssnet_artist")) }catch(e){ return null; } }
+function setLocalArtist(obj){ localStorage.setItem("sssnet_artist", JSON.stringify(obj)); }
+
+document.getElementById("regBtn").addEventListener("click", async ()=>{
+  const name = document.getElementById("name").value.trim();
+  const contact = document.getElementById("contact").value.trim();
+  if(!name) return alert("Masukkan nama");
+  if(role === 'fan'){
+    // save simple fan to localStorage
+    localStorage.setItem("sssnet_fan", JSON.stringify({ name, avatar:null }));
+    alert("Akun Fan disimpan. Kamu bisa edit di profile.");
+    showStatus();
+    return;
+  }
+  // artist register
+  const res = await fetch("/artist/register", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ name, contact })});
+  const j = await res.json();
+  if(j.success){
+    // find created artist from list
+    const all = await fetch("/artists").then(r=>r.json());
+    const me = all.find(a => a.name.toLowerCase()===name.toLowerCase());
+    if(me){ setLocalArtist(me); alert("Terdaftar - tunggu approval admin."); showStatus(); }
+    else { alert("Terdaftar, tapi id belum tampil. Cek admin."); }
+  } else {
+    if(j.error && j.error.toLowerCase().includes("already")){
+      const all = await fetch("/artists").then(r=>r.json());
+      const me = all.find(a=>a.name.toLowerCase()===name.toLowerCase());
+      if(me){ setLocalArtist(me); alert("Request sudah ada. Tunggu approval."); showStatus(); return; }
+    }
+    alert(j.error || "Gagal mendaftar");
+  }
+});
+
+async function showStatus(){
+  const statusBox = document.getElementById("status-box");
+  const saved = getLocalArtist();
+  if(!saved) { statusBox.innerHTML = "<p>Belum terdaftar sebagai artist. Atau login sebagai fan.</p>"; return; }
+  const res = await fetch("/artists/"+saved.id);
+  if(!res.ok){ localStorage.removeItem("sssnet_artist"); statusBox.innerHTML = "<p>Data tidak ditemukan, silakan daftar ulang.</p>"; return; }
+  const j = await res.json();
+  statusBox.innerHTML = `<p>Nama: <b>${j.artist.name}</b></p><p>Status: <b>${j.artist.status}</b></p>`;
+  if(j.artist.status === "approved"){
+    statusBox.innerHTML += `<p>Akun disetujui. Anda bisa mengakses fitur ARTIST.</p>`;
+    statusBox.innerHTML += `<p><button class="btn" onclick="goToDashboard(${j.artist.id})">DASHBOARD</button> <button class="btn" onclick="goToArtistPage(${j.artist.id})" style="background:#666">Lihat Page</button></p>`;
+  } else if(j.artist.status === "pending"){
+    statusBox.innerHTML += `<p class="small-muted">Request pending. Tunggu approval admin.</p>`;
+  } else if(j.artist.status === "rejected"){
+    statusBox.innerHTML += `<p style="color:#d01871">Request ditolak.</p>`;
+    localStorage.removeItem("sssnet_artist");
+  }
+}
+
+function goToDashboard(id){ location.href = "/artist_dashboard.html?id=" + id; }
+function goToArtistPage(id){ location.href = "/artist.html?id=" + id; }
+
+document.addEventListener("DOMContentLoaded", ()=>{ showStatus(); setInterval(showStatus, 6000); });
+</script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+cat > public/profile.html <<'HTML'
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profile • SSSNET</title>
+<link rel="stylesheet" href="style.css">
+
+<!-- Cropper.js (CDN) -->
+<link  href="https://unpkg.com/cropperjs@1.5.13/dist/cropper.min.css" rel="stylesheet">
+<style>
+.modal-backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:9999;
+}
+.crop-modal{ background:#fff; padding:12px; border-radius:10px; max-width:920px; width:94%; max-height:90vh; overflow:auto; }
+.preview-avatar{ width:96px; height:96px; border-radius:12px; object-fit:cover; border:2px solid #fff; box-shadow:0 6px 18px rgba(0,0,0,0.12) }
+.banner-preview{ width:100%; height:140px; object-fit:cover; border-radius:10px }
+.small-muted{ color:#666; font-size:13px }
+.row{ display:flex; gap:10px; align-items:center }
+.input{ padding:10px; border-radius:10px; border:1px solid #eee; width:100%; box-sizing:border-box }
+</style>
+</head>
+<body>
+<a href="/">← Home</a>
+
+<div class="container" style="max-width:900px; margin-top:14px;">
+  <h1>Account</h1>
+
+  <div id="not-logged" class="card">
+    <h3>Login / Daftar</h3>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <button id="btnFan" class="btn" onclick="setRole('fan')">FAN</button>
+      <button id="btnArtist" class="btn" onclick="setRole('artist')">ARTIST</button>
+    </div>
+    <input id="name" class="input" placeholder="Nama (username)"><br><br>
+    <input id="contact" class="input" placeholder="Contact / Bio (opsional)"><br><br>
+    <button id="regBtn" class="btn">Daftar / Login</button>
+    <p class="small-muted">Jika pilih ARTIST: admin harus approve sebelum fitur ARTIST aktif.</p>
+  </div>
+
+  <div id="profile-box" class="card" style="display:none">
+    <!-- FAN Profile -->
+    <div id="fan-profile" style="display:none">
+      <div class="row" style="justify-content:space-between">
+        <div style="display:flex;gap:12px;align-items:center">
+          <img id="fan-avatar" class="preview-avatar" src="/uploads/covers/placeholder.jpg" alt="avatar">
+          <div>
+            <div><b id="fan-name-display">User</b></div>
+            <div class="small-muted">FAN</div>
+          </div>
+        </div>
+        <div>
+          <button class="btn" onclick="openCropModal('fan-avatar')">Ganti Foto (avatar)</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Username</label>
+        <input id="fan-username" class="input" placeholder="username bebas">
+        <div style="margin-top:8px"><button class="btn" onclick="saveFanProfile()">Simpan</button></div>
+      </div>
+    </div>
+
+    <!-- ARTIST Profile -->
+    <div id="artist-profile" style="display:none">
+      <h2 id="artist-name-title">Artist</h2>
+      <div style="margin-top:8px">
+        <img id="artist-banner" class="banner-preview" src="/uploads/covers/placeholder.jpg" alt="banner">
+        <div style="margin-top:8px"><button class="btn" onclick="openCropModal('artist-banner')">Upload / Ganti Banner</button></div>
+      </div>
+
+      <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+        <img id="artist-avatar" class="preview-avatar" src="/uploads/covers/placeholder.jpg" alt="avatar">
+        <div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="artist-username" class="input" placeholder="username artist" style="width:260px">
+            <button class="btn" onclick="openCropModal('artist-avatar')">Upload Photo</button>
+          </div>
+          <div style="margin-top:8px">
+            <textarea id="artist-bio" class="input" placeholder="Deskripsi singkat" style="height:80px"></textarea>
+          </div>
+          <div style="margin-top:8px">
+            <button class="btn" onclick="saveArtistProfile()">Simpan perubahan</button>
+            <button class="btn" style="background:#999;margin-left:8px" onclick="logout()">Logout</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Crop modal (hidden) -->
+<div id="crop-backdrop" class="modal-backdrop" style="display:none">
+  <div class="crop-modal">
+    <h3>Crop and Upload</h3>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1">
+        <div style="width:100%;height:420px;display:flex;align-items:center;justify-content:center;background:#f6f6f6;padding:8px">
+          <img id="crop-image" style="max-width:100%;max-height:100%;display:block" src="">
+        </div>
+        <div style="margin-top:8px">
+          <input type="file" id="crop-input" accept="image/*">
+        </div>
+      </div>
+      <div style="width:260px">
+        <div style="margin-bottom:8px"><b>Preview</b></div>
+        <canvas id="crop-preview" style="width:100%;border-radius:8px;background:#eee"></canvas>
+        <div style="margin-top:12px">
+          <button class="btn" id="crop-upload-btn">Upload</button>
+          <button class="btn" style="background:#ccc;color:#000;margin-left:8px" id="crop-cancel-btn">Batal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cropper.js -->
+<script src="https://unpkg.com/cropperjs@1.5.13/dist/cropper.min.js"></script>
+
+<script>
+// ---------- helper session & UI ----------
+function getLocalSession(){ try{ return JSON.parse(localStorage.getItem("sssnet_session")) }catch(e){ return null; } }
+function setLocalSession(x){ localStorage.setItem("sssnet_session", JSON.stringify(x)); updateUI(); }
+function clearLocalSession(){ localStorage.removeItem("sssnet_session"); updateUI(); }
+
+function setRole(r){
+  role = r;
+  document.getElementById('btnFan').style.opacity = r==='fan' ? '1' : '0.6';
+  document.getElementById('btnArtist').style.opacity = r==='artist' ? '1' : '0.6';
+}
+
+document.getElementById("regBtn").addEventListener("click", async ()=>{
+  const name = document.getElementById("name").value.trim();
+  const contact = document.getElementById("contact").value.trim();
+  if(!name) return alert("Masukkan nama");
+  if(role === 'fan'){
+    // simpan di localStorage
+    const fan = { role:'fan', name, username: name, avatar: '/uploads/covers/placeholder.jpg' };
+    setLocalSession(fan);
+    alert("Logged in as Fan");
+    return;
+  }
+  // ARTIST register (server)
+  try{
+    const res = await fetch("/artist/register", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ name, contact })});
+    const j = await res.json();
+    // ambil artist object sekarang dari server
+    const all = await fetch("/artists").then(r=>r.json());
+    const me = all.find(a => a.name.toLowerCase()===name.toLowerCase());
+    if(me){
+      setLocalSession({ role:'artist', name: me.name, artistId: me.id, approved: me.status === 'approved', avatar: me.avatar || '/uploads/covers/placeholder.jpg', banner: me.banner || '/uploads/covers/placeholder.jpg' });
+      alert("Artist request recorded. Tunggu admin meninjau. Jika disetujui, fitur artist aktif.");
+    } else {
+      alert(j.error || "Terjadi masalah saat mendaftar");
+    }
+  }catch(e){ alert("Gagal mendaftar"); }
+});
+
+function logout(){ clearLocalSession(); alert("Logged out"); location.reload(); }
+
+// update UI berdasarkan session
+async function updateUI(){
+  const s = getLocalSession();
+  const notLogged = document.getElementById("not-logged");
+  const profileBox = document.getElementById("profile-box");
+  const fanProfile = document.getElementById("fan-profile");
+  const artistProfile = document.getElementById("artist-profile");
+  notLogged.style.display = s ? "none" : "block";
+  profileBox.style.display = s ? "block" : "none";
+
+  if(!s) return;
+
+  if(s.role === 'fan'){
+    fanProfile.style.display = "block";
+    artistProfile.style.display = "none";
+    document.getElementById("fan-avatar").src = s.avatar || "/uploads/covers/placeholder.jpg";
+    document.getElementById("fan-name-display").innerText = s.name || s.username || "Fan";
+    document.getElementById("fan-username").value = s.username || s.name || "";
+  } else {
+    // artist: get fresh data from server
+    fanProfile.style.display = "none";
+    artistProfile.style.display = "block";
+    try{
+      const res = await fetch("/artists/" + s.artistId);
+      if(!res.ok) { console.warn("artist not found"); return; }
+      const j = await res.json();
+      const a = j.artist;
+      document.getElementById("artist-banner").src = a.banner || "/uploads/covers/placeholder.jpg";
+      document.getElementById("artist-avatar").src = a.avatar || "/uploads/covers/placeholder.jpg";
+      document.getElementById("artist-username").value = a.name || "";
+      document.getElementById("artist-bio").value = a.bio || "";
+      document.getElementById("artist-name-title").innerText = a.name || "Artist";
+      // update session snapshot
+      s.approved = a.status === 'approved';
+      s.avatar = a.avatar; s.banner = a.banner;
+      setLocalSession(s);
+    }catch(e){ console.error(e); }
+  }
+}
+
+// save fan profile to localStorage
+function saveFanProfile(){
+  const s = getLocalSession();
+  if(!s || s.role !== 'fan') return alert("Not fan");
+  s.username = document.getElementById("fan-username").value.trim() || s.name;
+  setLocalSession(s);
+  alert("Profile fan disimpan");
+}
+
+// save artist profile -> panggil server update
+async function saveArtistProfile(){
+  const s = getLocalSession();
+  if(!s || s.role !== 'artist') return alert("Not artist");
+  const artistId = s.artistId;
+  const name = document.getElementById("artist-username").value.trim();
+  const bio = document.getElementById("artist-bio").value.trim();
+  const payload = { name, bio };
+  const res = await fetch("/artist/" + artistId + "/updateProfile", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+  const j = await res.json();
+  if(j.success){ alert("Profil artist disimpan"); updateUI(); } else alert(j.error || "gagal simpan");
+}
+
+// ---------- Cropper modal behavior ----------
+let cropper = null;
+let cropTarget = null; // 'fan-avatar' | 'artist-avatar' | 'artist-banner' etc.
+
+const cropBackdrop = document.getElementById("crop-backdrop");
+const cropInput = document.getElementById("crop-input");
+const cropImage = document.getElementById("crop-image");
+const previewCanvas = document.getElementById("crop-preview");
+const uploadBtn = document.getElementById("crop-upload-btn");
+const cancelBtn = document.getElementById("crop-cancel-btn");
+
+function openCropModal(targetId){
+  cropTarget = targetId;
+  cropBackdrop.style.display = 'flex';
+  cropImage.src = '';
+  previewCanvas.width = 260; previewCanvas.height = 260;
+  if(cropper){ cropper.destroy(); cropper = null; }
+  cropInput.value = '';
+}
+
+// when user picks a file in modal
+cropInput.addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if(!f) return;
+  const url = URL.createObjectURL(f);
+  cropImage.src = url;
+  if(cropper) cropper.destroy();
+  cropImage.onload = () => {
+    cropper = new Cropper(cropImage, {
+      aspectRatio: cropTarget === 'artist-banner' ? 16/6 : 1, // banner wide, avatar square
+      viewMode: 1,
+      autoCropArea: 1,
+      responsive: true,
+      ready(){ updatePreview(); },
+      crop(){ updatePreview(); }
+    });
+  };
+});
+
+function updatePreview(){
+  if(!cropper) return;
+  const canvas = cropper.getCroppedCanvas({ width: 720, height: 720 });
+  const ctx = previewCanvas.getContext('2d');
+  previewCanvas.width = 260; previewCanvas.height = 260;
+  // draw scaled preview
+  ctx.clearRect(0,0,previewCanvas.width, previewCanvas.height);
+  ctx.drawImage(canvas, 0, 0, previewCanvas.width, previewCanvas.height);
+}
+
+// upload cropped image -> call /upload/cover then update session/server
+uploadBtn.addEventListener("click", async () => {
+  if(!cropper) return alert("Pilih file dulu");
+  uploadBtn.disabled = true; uploadBtn.innerText = "Uploading...";
+  try{
+    const blob = await new Promise(res => cropper.getCroppedCanvas().toBlob(res, 'image/jpeg', 0.9));
+    const fd = new FormData(); fd.append("cover", blob, "cover.jpg");
+    const r = await fetch("/upload/cover", { method:"POST", body: fd });
+    const j = await r.json();
+    if(!j || !j.url) { alert("Gagal upload"); uploadBtn.disabled=false; uploadBtn.innerText="Upload"; return; }
+    const url = j.url;
+    // update UI / server depending on target
+    const s = getLocalSession();
+    if(cropTarget === 'fan-avatar'){
+      s.avatar = url; setLocalSession(s);
+      document.getElementById("fan-avatar").src = url;
+    } else if(cropTarget === 'artist-avatar'){
+      // call server update
+      await fetch("/artist/" + s.artistId + "/updateProfile", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ avatar: url })});
+      s.avatar = url; setLocalSession(s); document.getElementById("artist-avatar").src = url;
+    } else if(cropTarget === 'artist-banner'){
+      await fetch("/artist/" + s.artistId + "/updateProfile", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ banner: url })});
+      s.banner = url; setLocalSession(s); document.getElementById("artist-banner").src = url;
+    }
+    alert("Upload sukses");
+    closeCrop();
+    updateUI();
+  }catch(err){
+    console.error(err);
+    alert("Error upload");
+  } finally {
+    uploadBtn.disabled=false; uploadBtn.innerText="Upload";
+  }
+});
+
+cancelBtn.addEventListener("click", ()=>{ closeCrop(); });
+
+function closeCrop(){
+  if(cropper){ cropper.destroy(); cropper = null; }
+  cropBackdrop.style.display = 'none';
+  cropImage.src = '';
+  cropInput.value = '';
+  previewCanvas.getContext('2d').clearRect(0,0,previewCanvas.width, previewCanvas.height);
+}
+
+// ---------- init ----------
+let role = 'fan';
+document.addEventListener("DOMContentLoaded", ()=>{
+  setRole('fan');
+  updateUI();
+});
+</script>
+</body>
+</html>
+HTML

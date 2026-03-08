@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Upload Reel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h2>Upload Reel</h2>
+  <input type="file" id="video" accept="video/*"><br><br>
+  <div id="editor-container" style="width:360px;height:640px;border:1px solid #444;margin-bottom:8px"></div>
+
+  <label>Trim Start (s): <input type="number" id="trimStart"></label><br>
+  <label>Trim End (s): <input type="number" id="trimEnd"></label><br>
+
+  <label>Audio Upload: <input type="file" id="audioFile"></label><br>
+  <label>Or Preset: <select id="audioPreset"><option value="">None</option></select></label><br>
+
+  <label>Description: <input id="desc"></label><br>
+  <label>Hashtags: <input id="hashtags"></label><br>
+  <label>Visibility: <select id="visibility"><option value="public">Public</option><option value="private">Private</option></select></label><br>
+
+  <button onclick="uploadReel()">Upload!</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/area-selection-js@latest/dist/area-selection.min.js"></script>
+  <script>
+  let cropParams={x:0,y:0,w:0,h:0};
+  let videoFile=null;
+  document.getElementById("video").onchange=(e)=>{
+    videoFile=e.target.files[0];
+    const url=URL.createObjectURL(videoFile);
+    const vid = document.createElement("video");
+    vid.src=url;
+    vid.style.width="100%";
+    document.getElementById("editor-container").innerHTML="";
+    document.getElementById("editor-container").append(vid);
+    vid.onloadedmetadata=()=>{
+      const selector=new AreaSelector(vid,{aspectRatio:0});
+      selector.onChange=(p)=>{cropParams=p;}
+    }
+  };
+
+  async function uploadReel(){
+    const token=localStorage.getItem("sssnet_token");
+    if(!token) return alert("Login dulu");
+
+    const data = new FormData();
+    data.append("video", videoFile);
+    data.append("trimStart", document.getElementById("trimStart").value);
+    data.append("trimEnd", document.getElementById("trimEnd").value);
+    data.append("cropX", cropParams.x);
+    data.append("cropY", cropParams.y);
+    data.append("cropW", cropParams.w);
+    data.append("cropH", cropParams.h);
+    let af=document.getElementById("audioFile").files[0];
+    if(af) data.append("audioFileName", af.name), data.append("audio", af), data.append("audioType","upload");
+    else data.append("audioPreset", document.getElementById("audioPreset").value), data.append("audioType","preset");
+    data.append("description",document.getElementById("desc").value);
+    data.append("hashtags",document.getElementById("hashtags").value);
+    data.append("visibility",document.getElementById("visibility").value);
+
+    await fetch("/upload/reel",{method:"POST",headers:{"Authorization":"Bearer "+token},body:data});
+    alert("Uploaded");
+    location="/";
+  }
+  </script>
+</body>
+</html>

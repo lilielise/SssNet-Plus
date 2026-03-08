@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Artist Dashboard • SSSNET</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px }
+.upload-card{ display:flex; gap:8px; flex-direction:column }
+.flex-row{ display:flex; gap:8px; align-items:center }
+.small-muted{ color:#666 }
+</style>
+</head>
+<body>
+<a href="/">← Home</a>
+<div class="container">
+  <div class="header">
+    <h1>Artist Dashboard</h1>
+    <div class="small-muted">Manage Reels & SNEWS</div>
+  </div>
+
+  <div class="card">
+    <h3>Upload Reel (video)</h3>
+    <input type="file" id="videoFile" accept="video/*"><br>
+    <input id="videoCaption" class="input" placeholder="Caption (optional)">
+    <div style="margin-top:8px"><button class="btn" onclick="uploadReel()">Upload Reel</button></div>
+  </div>
+
+  <div class="card">
+    <h3>Post SNEWS</h3>
+    <input id="news_title" class="input" placeholder="Judul berita">
+    <textarea id="news_body" class="input" placeholder="Isi berita" style="height:100px"></textarea>
+    <input id="news_image" class="input" placeholder="Image URL (optional)">
+    <div style="margin-top:8px"><button class="btn" onclick="postSnews()">Post</button></div>
+  </div>
+
+  <div class="card">
+    <h3>Your Content</h3>
+    <div id="artist_content">loading...</div>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const artistId = params.get("id");
+if(!artistId) { alert("Artist ID missing"); location.href="/"; }
+
+async function uploadReel(){
+  const f = document.getElementById("videoFile").files[0];
+  if(!f) return alert("Pilih file video");
+  const fd = new FormData(); fd.append("video", f); fd.append("artistId", artistId);
+  const res = await fetch("/upload/video", { method:"POST", body: fd });
+  const j = await res.json();
+  if(j.success) { alert("Video uploaded"); loadContent(); } else alert(j.error||"gagal upload");
+}
+
+async function postSnews(){
+  const title = document.getElementById("news_title").value.trim();
+  const body = document.getElementById("news_body").value.trim();
+  const image = document.getElementById("news_image").value.trim();
+  if(!title || !body) return alert("Judul & isi wajib");
+  await fetch("/news", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ title, body, image, artistId: Number(artistId) }) })
+    .then(r=>r.json()).then(j=>{ if(j.success) { alert("News posted"); loadContent(); } else alert(j.error || "gagal") });
+}
+
+// server currently has no POST /news for artists, so call admin create? We'll use an artist endpoint:
+// Add server endpoint: POST /artist/:id/news (already implemented earlier)
+async function postSnews(){
+  const title = document.getElementById("news_title").value.trim();
+  const body = document.getElementById("news_body").value.trim();
+  const image = document.getElementById("news_image").value.trim();
+  if(!title || !body) return alert("Judul & isi wajib");
+  const res = await fetch("/artist/" + artistId + "/news", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ title, body, image })});
+  const j = await res.json();
+  if(j.success){ alert("News posted"); loadContent(); } else alert(j.error||"gagal");
+}
+
+async function loadContent(){
+  const artist = await fetch("/artists/" + artistId).then(r=>r.json());
+  const videos = artist.videos || [];
+  const news = artist.news || [];
+  const el = document.getElementById("artist_content");
+  el.innerHTML = `
+    <h4>Reels</h4>
+    ${videos.length ? videos.map(v=>`<div class="card-compact"><video src="${v.file}" controls width="100"></video><div class="small-muted">${new Date(v.createdAt).toLocaleString()}</div><div style="margin-top:6px"><button class="btn" onclick="deleteVideo(${v.id})">Delete</button></div></div>`).join("") : "<p>Tidak ada reels</p>"}
+    <h4 style="margin-top:12px">SNEWS</h4>
+    ${news.length ? news.map(n=>`<div class="card-compact"><h4>${n.title}</h4><div class="small-muted">${new Date(n.createdAt).toLocaleString()}</div><p>${n.body}</p><div style="margin-top:6px"><button class="btn" onclick="deleteNewsArtist(${n.id})">Delete</button></div></div>`).join("") : "<p>Tidak ada news</p>"}
+  `;
+}
+
+async function deleteVideo(id){
+  if(!confirm("Hapus video?")) return;
+  // no endpoint yet; fallback: delete from DB via admin? We'll call /admin/deleteVideo if implemented.
+  alert("Fitur delete video akan diproses di server. (Implement endpoint admin jika perlu)");
+}
+
+async function deleteNewsArtist(id){
+  if(!confirm("Hapus news?")) return;
+  // Assume admin can delete via /admin/deleteNews
+  const res = await fetch("/admin/deleteNews", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ newsId: id })});
+  const j = await res.json();
+  if(j.success) { alert("News deleted"); loadContent(); } else alert(j.error || "gagal");
+}
+
+loadContent();
+</script>
+</body>
+</html>

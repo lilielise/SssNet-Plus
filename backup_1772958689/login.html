@@ -1,0 +1,40 @@
+<!-- KUNCI: public/login.html -->
+<!doctype html>
+<html>
+<head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Login / Daftar</title><link rel="stylesheet" href="style.css"></head>
+<body>
+  <h2>Login</h2>
+  <input id="u" placeholder="Username"><br>
+  <input id="p" type="password" placeholder="Password"><br>
+  <button id="btnLogin">Login</button>
+
+  <h2>Daftar</h2>
+  <input id="ru" placeholder="Username"><br>
+  <input id="rp" type="password" placeholder="Password"><br>
+  <div style="margin:8px 0;">
+    <button id="roleFan" class="role-btn active">FAN</button>
+    <button id="roleArtist" class="role-btn">ARTIST</button>
+  </div>
+  <button id="btnRegister">Daftar</button>
+
+<script>
+let chosenRole = "fan";
+document.getElementById("roleFan").onclick = ()=> { chosenRole="fan"; document.getElementById("roleFan").classList.add('active'); document.getElementById("roleArtist").classList.remove('active'); };
+document.getElementById("roleArtist").onclick = ()=> { chosenRole="artist"; document.getElementById("roleArtist").classList.add('active'); document.getElementById("roleFan").classList.remove('active'); };
+
+document.getElementById("btnLogin").onclick = async ()=>{
+  const u=document.getElementById("u").value, p=document.getElementById("p").value;
+  const res = await fetch("/auth/login",{method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ username:u, password:p })});
+  const j = await res.json();
+  if(j.token){ localStorage.setItem("sssnet_token", j.token); localStorage.setItem("sssnet_user", JSON.stringify(j.user)); alert("Login sukses"); location="/"; } else alert(j.error||"Gagal login");
+};
+
+document.getElementById("btnRegister").onclick = async ()=>{
+  const u=document.getElementById("ru").value, p=document.getElementById("rp").value;
+  const res = await fetch("/auth/register",{method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ username:u, password:p, role:chosenRole })});
+  const j = await res.json();
+  if(j.success) alert("Terdaftar. Silakan login."); else alert(j.error||"Gagal daftar");
+};
+</script>
+</body>
+</html>

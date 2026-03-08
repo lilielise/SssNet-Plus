@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Event - SSSNET</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a href="/" style="display:inline-block;margin:12px 8px;">← Back</a>
+<div id="event-root" class="container"></div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const id = params.get("id");
+if(!id) document.getElementById("event-root").innerText = "Event ID missing";
+
+let pollTimer = null;
+
+async function loadEventOnce(){
+  const res = await fetch("/events/" + id);
+  if(!res.ok) { document.getElementById("event-root").innerText = "Event not found"; return; }
+  const data = await res.json();
+  renderEvent(data);
+}
+
+function renderEvent(data){
+  const el = document.getElementById("event-root");
+  el.innerHTML = `
+    <div class="card">
+      <h1>${data.name}</h1>
+      <div class="small">Status: <b>${data.status}</b></div>
+      <div id="countdown" class="small" style="margin-top:8px"></div>
+    </div>
+    <div id="songs-container"></div>
+  `;
+  updateSongsUI(data);
+  startCountdown(data.endAt);
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async ()=>{
+    const r = await fetch("/events/" + id);
+    const fresh = await r.json();
+    updateSongsUI(fresh);
+  }, 4000);
+}
+
+function updateSongsUI(data){
+  const songs = data.songs || [];
+  const total = songs.reduce((a,b)=>a+(b.votes||0),0);
+  const cont = document.getElementById("songs-container");
+  if(!songs.length){ cont.innerHTML = "<p>Tidak ada lagu di event ini.</p>"; return; }
+  songs.sort((a,b)=> (b.votes||0) - (a.votes||0));
+  cont.innerHTML = songs.map((s,i)=>{
+    const pct = total ? Math.round(((s.votes||0)/total)*100) : 0;
+    return `
+      <div class="song card">
+        <img src="${s.cover||'/uploads/covers/placeholder.jpg'}" class="cover-img">
+        <div class="song-info">
+          <h3>#${i+1} ${s.title} — ${s.artistName||s.artist}</h3>
+          <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+          <p class="small">${pct}%</p>
+          ${data.status === 'ongoing' ? `<button onclick="vote(${s.id})" class="btn">Vote</button>` : `<em class="small">Voting closed</em>`}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function startCountdown(endAt){
+  const end = new Date(endAt).getTime();
+  const cdEl = document.getElementById("countdown");
+  const tick = () => {
+    const d = end - Date.now();
+    if(d <= 0){ cdEl.innerText = "Event ended"; if(pollTimer) clearInterval(pollTimer); return; }
+    const h = Math.floor(d/(1000*60*60));
+    const m = Math.floor((d%(1000*60*60))/(1000*60));
+    const s = Math.floor((d%(1000*60))/1000);
+    cdEl.innerText = `Ends in ${h}h ${m}m ${s}s`;
+  };
+  tick(); setInterval(tick,1000);
+}
+
+async function vote(songId){
+  const res = await fetch("/vote", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ songId })});
+  const j = await res.json();
+  if(j.error) alert(j.error); else alert("Voted ✔");
+  const r = await fetch("/events/" + id);
+  const fresh = await r.json();
+  updateSongsUI(fresh);
+}
+
+loadEventOnce();
+</script>
+</body>
+</html>
