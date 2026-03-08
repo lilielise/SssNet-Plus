@@ -379,3 +379,8 @@ app.post("/artist/:id/updateProfile", (req,res) => {
   }
 });
 app.listen(3000);
+
+/* --- added for hosting (Railway, etc.) --- */
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Server running on", PORT));
+/* ----------------------------------------- */
