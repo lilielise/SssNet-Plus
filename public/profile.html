@@ -1,4 +1,3 @@
-cat > public/profile.html <<'HTML'
 <!doctype html>
 <html>
 <head>
@@ -323,6 +322,15 @@ document.addEventListener("DOMContentLoaded", ()=>{
   updateUI();
 });
 </script>
+</html>
+<button id="logoutBtn">Logout</button>
+
+<script>
+document.getElementById("logoutBtn").addEventListener("click", function(){
+  localStorage.removeItem("user");
+  sessionStorage.clear();
+  window.location.href = "/";
+});
+</script>
 </body>
 </html>
-HTML

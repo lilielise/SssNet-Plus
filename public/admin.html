@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Admin Panel</title>
+</head>
+
+<body>
+
+<h2>Create Event</h2>
+
+<form id="eventForm">
+<input id="eventTitle" placeholder="Event title">
+<button type="submit">Submit Event</button>
+</form>
+
+<h2>News List</h2>
+<div id="newsList"></div>
+
+<script>
+
+document.getElementById("eventForm").addEventListener("submit", function(e){
+e.preventDefault();
+
+const title = document.getElementById("eventTitle").value;
+
+fetch("/api/events",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({title:title})
+})
+.then(res=>res.json())
+.then(()=>{
+alert("Event created");
+});
+
+});
+
+
+async function loadNews(){
+
+const res = await fetch("/api/news");
+const data = await res.json();
+
+const list = document.getElementById("newsList");
+
+list.innerHTML="";
+
+data.forEach(n=>{
+
+list.innerHTML += `
+<div>
+
+<h3>${n.title}</h3>
+
+<button onclick="deleteNews('${n.id}')">
+Delete
+</button>
+
+</div>
+`;
+
+});
+
+}
+
+
+async function deleteNews(id){
+
+await fetch("/api/news/"+id,{
+method:"DELETE"
+});
+
+loadNews();
+
+}
+
+loadNews();
+
+</script>
+
+</body>
+</html>
