@@ -11,6 +11,37 @@ app.use(express.urlencoded({ extended: true }));
 
 // static
 app.use(express.static(path.join(__dirname, "public")));
+// === ROUTING KHUSUS SUPAYA HTML TERJEMPUT ===
+
+// admin panel
+app.get("/admin.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
+// profile page
+app.get("/profile.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "profile.html"));
+});
+
+// event page
+app.get("/event.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "event.html"));
+});
+
+// news page
+app.get("/news.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "news.html"));
+});
+
+// artist page
+app.get("/artist.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "artist.html"));
+});
+
+// artist dashboard
+app.get("/artist_dashboard.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "artist_dashboard.html"));
+});
 app.use("/admin", express.static(path.join(__dirname, "admin")));
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
